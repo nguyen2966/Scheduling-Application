@@ -194,3 +194,93 @@ test('concurrent localhost app processes create only one conflicting booking and
   }
   t.diagnostic(`Create-booking localhost race and restart passed for ${created.lesson_id}`);
 });
+
+test('two app processes cannot overwrite the same version; reschedule/cancellation history persists after restart', { timeout: 20000 }, async (t) => {
+  const fixture = workspace(t);
+  const database = openDatabase(fixture.path);
+  setupDatabase(database);
+  database.close();
+  const children = [fixture.start(), fixture.start()];
+  const urls = await Promise.all(children.map(waitForUrl));
+  const responses = await Promise.all(urls.map((url, index) => fetch(`${url}/bookings/L001`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'If-Match': '"booking-L001-v1"' },
+    body: JSON.stringify({ start_time: index === 0 ? '08:30' : '08:00', reason: 'requested earlier time' }),
+    signal: AbortSignal.timeout(10000),
+  })));
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 412]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+  const winner = bodies[responses.findIndex((response) => response.status === 200)].data.booking;
+  assert.equal(winner.version, 2);
+  assert.equal(bodies[responses.findIndex((response) => response.status === 412)].code.key, 'PRECONDITION_FAILED');
+  const cancelled = await fetch(`${urls[0]}/bookings/L001`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'If-Match': '"booking-L001-v2"' },
+    body: JSON.stringify({ status: 'cancelled', reason: 'family cancelled after rescheduling' }),
+  });
+  assert.equal(cancelled.status, 200);
+  const final = (await cancelled.json()).data.booking;
+  assert.equal(final.version, 3);
+  assert.equal(final.status, 'cancelled');
+  for (const child of children) await stop(child);
+
+  const restarted = fixture.start();
+  const url = await waitForUrl(restarted);
+  const detail = await fetch(`${url}/bookings/L001`);
+  assert.deepEqual((await detail.json()).data.booking, final);
+  assert.equal(detail.headers.get('etag'), '"booking-L001-v3"');
+  const history = await fetch(`${url}/bookings/L001/changes`);
+  const changes = (await history.json()).data.items;
+  assert.deepEqual(changes.map((change) => change.action), ['imported', 'updated', 'cancelled']);
+  assert.equal(changes[1].before_snapshot.version, 1);
+  assert.deepEqual(changes[1].after_snapshot, winner);
+  assert.deepEqual(changes[2].before_snapshot, winner);
+  assert.deepEqual(changes[2].after_snapshot, final);
+  await stop(restarted);
+  const saved = openDatabase(fixture.path, { readOnly: true });
+  try {
+    assert.equal(saved.prepare('SELECT count(*) AS count FROM bookings').get().count, 34);
+    assert.equal(saved.prepare('SELECT count(*) AS count FROM booking_changes').get().count, 36);
+  } finally {
+    saved.close();
+  }
+  t.diagnostic('Localhost reschedule/cancellation version race and restart passed.');
+});
+
+test('concurrent reschedules into one slot conflict, and cancellation releases it for the other booking', { timeout: 20000 }, async (t) => {
+  const fixture = workspace(t);
+  const database = openDatabase(fixture.path);
+  setupDatabase(database);
+  database.close();
+  const children = [fixture.start(), fixture.start()];
+  const urls = await Promise.all(children.map(waitForUrl));
+  const ids = ['L001', 'L003'];
+  const move = (index) => fetch(`${urls[index]}/bookings/${ids[index]}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'If-Match': `"booking-${ids[index]}-v1"` },
+    body: JSON.stringify({ date: '2026-03-04', start_time: '15:00', reason: 'move to requested slot' }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const responses = await Promise.all([move(0), move(1)]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+  const winner = responses.findIndex((response) => response.status === 200);
+  const loser = 1 - winner;
+  assert.equal(bodies[loser].code.key, 'TUTOR_SCHEDULE_CONFLICT');
+  const cancellation = await fetch(`${urls[winner]}/bookings/${ids[winner]}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'If-Match': `"booking-${ids[winner]}-v2"` },
+    body: JSON.stringify({ status: 'cancelled', reason: 'administrative_room_change' }),
+  });
+  assert.equal(cancellation.status, 200);
+  await cancellation.json();
+  const retry = await move(loser);
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).data.booking.version, 2);
+  for (const child of children) await stop(child);
+  const saved = openDatabase(fixture.path, { readOnly: true });
+  try {
+    assert.equal(saved.prepare('SELECT count(*) AS count FROM booking_changes').get().count, 37);
+    assert.equal(saved.prepare('SELECT status FROM bookings WHERE lesson_id = ?').get(ids[winner]).status, 'cancelled');
+    assert.equal(saved.prepare('SELECT start_time FROM bookings WHERE lesson_id = ?').get(ids[loser]).start_time, '15:00');
+  } finally {
+    saved.close();
+  }
+  t.diagnostic('Localhost rescheduling slot race and cancellation resource release passed.');
+});

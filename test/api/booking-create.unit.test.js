@@ -133,6 +133,7 @@ test('POST booking route requires JSON and dispatches to its creation controller
   let created = 0;
   const router = createBookingRouter({ bookingController: {
     list(req, res) { res.end(); }, get(req, res) { res.end(); },
+    update(req, res) { res.end(); },
     create(req, res) { assert.equal(req.body, input); created++; res.end(); },
   } });
   const rejected = await invokeRouter(router, 'POST');

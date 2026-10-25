@@ -53,7 +53,7 @@ test('booking detail has a version ETag and supports conditional GET, HEAD, and 
   assert.equal(await head.text(), '');
   const options = await fetch(url, { method: 'OPTIONS' });
   assert.equal(options.status, 204);
-  assert.equal(options.headers.get('allow'), 'GET, HEAD, OPTIONS');
+  assert.equal(options.headers.get('allow'), 'GET, HEAD, PATCH, OPTIONS');
   assert.equal(await options.text(), '');
 });
 
@@ -79,10 +79,10 @@ test('invalid booking filters return 422, missing IDs return 404, and malformed 
   assert.equal((await malformed.json()).code.key, 'INVALID_PATH');
 });
 
-test('booking edits/deletes remain unavailable and do not alter seed data', async (t) => {
+test('unsupported booking methods do not alter seed data', async (t) => {
   const database = seededDatabase(t);
   const origin = await serve(t, createApp({ database }));
-  for (const [path, method] of [['/bookings', 'PUT'], ['/bookings/L001', 'PATCH'], ['/bookings/L001', 'DELETE']]) {
+  for (const [path, method] of [['/bookings', 'PUT'], ['/bookings/L001', 'PUT'], ['/bookings/L001', 'DELETE']]) {
     const response = await fetch(`${origin}/api/v1${path}`, { method });
     assert.equal(response.status, 405);
     assert.equal((await response.json()).code.key, 'METHOD_NOT_ALLOWED');
