@@ -1,6 +1,6 @@
 # Bright Path Booking Management
 
-A front-desk booking tool for Bright Path Learning Centre. The SQLite schema, CSV import, verification commands, and database tests are implemented. The booking API and Pug interface remain placeholders.
+A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and the read-only Room API are implemented. Tutor/booking endpoints and the Pug interface remain placeholders.
 
 ## Requirements
 
@@ -79,7 +79,7 @@ npm run test:db
 
 `db:verify` opens the existing database **read-only** and checks schema version, SQLite integrity, foreign keys, counts, every tutor and booking against the CSV source, all six rooms, and each baseline history snapshot. It does not create a missing database. It is an exact **seed-baseline check**, so it is expected to fail after staff intentionally change bookings or the source CSV files.
 
-`npm test` runs the project's tests; `npm run test:db` runs only database tests. Tests use in-memory databases and isolated temporary files, clean up their own files, and never reset the default database. Coverage includes:
+`npm test` runs all tests; `npm run test:db` runs only database tests; `npm run test:api` runs API tests. Tests use in-memory databases and isolated temporary files, clean up their own files, and never reset the default database. Database coverage includes:
 
 - Full seed preservation, including historical conflicts, no-shows, and cancellations.
 - Repeated-import rejection without overwriting staff changes.
@@ -90,3 +90,76 @@ npm run test:db
 - CLI persistence, paths containing spaces, missing-file failures, and execution from another working directory.
 
 Database details and the boundary between SQLite constraints and future API validation are documented in [designs/db_designs.md](designs/db_designs.md).
+
+## Start the API
+
+After setting up the database, run:
+
+```sh
+npm start
+```
+
+The default address is **http://127.0.0.1:3000/api/v1/rooms**. `npm run dev` starts the same entry point with Node's file watcher. Stop the application with Ctrl+C; the server stops accepting requests and closes its database connection. Startup opens the existing database and never creates a schema or imports CSV data. A missing database or unsupported/uninitialized schema produces an error and exits with code 1.
+
+| Environment variable | Default | Meaning |
+|---|---|---|
+| `HOST` | `127.0.0.1` | Listening hostname/IP |
+| `PORT` | `3000` | Port 0–65535; 0 asks the OS for an available port |
+| `DATABASE_PATH` | `data/bright-path.sqlite` | Existing database, relative to the project root or absolute |
+
+Set exported environment variables before `npm start` to override these values. For example, in PowerShell:
+
+```powershell
+$env:PORT = '3100'
+$env:DATABASE_PATH = 'data/bright-path-demo.sqlite'
+npm start
+```
+
+The database selected here must already have been initialized using `npm run db:setup -- --db data/bright-path-demo.sqlite`. `.env` files are not automatically loaded.
+
+## Room API
+
+`GET /api/v1/rooms` returns every stored room, sorted by `room_id`. It takes no required parameters and does not mutate the database. On the seeded database it returns R1–R6, including rooms with no bookings.
+
+Test it from another PowerShell terminal:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/rooms | ConvertTo-Json -Depth 5
+```
+
+Or use curl (`curl.exe` in Windows PowerShell):
+
+```sh
+curl http://127.0.0.1:3000/api/v1/rooms
+```
+
+The response is HTTP 200 with `Content-Type: application/json`:
+
+```json
+{
+  "data": {
+    "items": [
+      { "room_id": "R1" },
+      { "room_id": "R2" },
+      { "room_id": "R3" },
+      { "room_id": "R4" },
+      { "room_id": "R5" },
+      { "room_id": "R6" }
+    ]
+  },
+  "code": {
+    "http_status": 200,
+    "key": "ROOMS_RETRIEVED",
+    "message": "Rooms retrieved successfully."
+  },
+  "timestamp": {
+    "iso": "2026-03-03T06:00:00.000Z"
+  }
+}
+```
+
+The timestamp above is illustrative; actual responses use the current server instant, independent of a future pinned booking-demo clock.
+
+`HEAD` returns headers without a body. `OPTIONS` returns bodyless 204 and `Allow: GET, HEAD, OPTIONS`. Room mutations return 405 with the same `Allow` header; unknown `/api/v1` paths return 404. JSON parse errors return 400, oversized JSON bodies return 413 (16 KiB limit), and unsupported JSON charset/content encoding returns 415. Unexpected failures return a safe 500 response. All API JSON bodies use the same `data`, `code`, and `timestamp` envelope.
+
+The feature follows routes → controller → service → repository. `createApp` composes these layers without opening a database or listening on a port; `index.js` owns startup and shutdown. API tests cover isolated routing, controllers, services, SQL reads, HTTP contracts/error handling, configuration, and starting/restarting the actual entry point on localhost with a disposable seeded database.
