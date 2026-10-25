@@ -1,0 +1,9 @@
+extends layout
+
+block content
+  main#main-content.page-shell.error-shell(tabindex='-1')
+    section.error-panel
+      p.eyebrow= 'SCHEDULE · ' + status
+      h1= title
+      p= message
+      a.button.button-primary(href=calendarHref) Return to schedule

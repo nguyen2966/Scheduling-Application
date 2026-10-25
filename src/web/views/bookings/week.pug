@@ -1,0 +1,90 @@
+extends ../layout
+
+block content
+  main#main-content.page-shell(tabindex='-1', data-week=week, data-room=room)
+    .page-heading
+      div
+        p.eyebrow BOOKING CALENDAR
+        h1 Weekly schedule
+        p.page-subtitle A little clarity for every learning day.
+      .reference-date
+        span.context-dot(aria-hidden='true')
+        span= referenceLabel
+    section.schedule-section(aria-label='Weekly room schedule')
+      .schedule-toolbar
+        .week-heading
+          h2= weekLabel
+          p All times in Ho Chi Minh City
+        .schedule-controls
+          form.room-selector(method='GET', action='/bookings')
+            input(type='hidden', name='week', value=week)
+            label(for='room') Room
+            select#room(name='room')
+              each option in rooms
+                option(value=option.room_id, selected=option.room_id === room)= 'Room ' + option.room_id.slice(1)
+            button.button.button-small(type='submit') View
+          nav.week-navigation(aria-label='Week navigation')
+            a.icon-button(href=previousHref, aria-label='Previous week', title='Previous week') ←
+            a.button(href=referenceHref) This week
+            a.icon-button(href=nextHref, aria-label='Next week', title='Next week') →
+      .schedule-summary
+        p
+          strong= lessonCount
+          |  #{lessonCount === 1 ? 'lesson' : 'lessons'} in Room #{room.slice(1)} this week
+        ul.legend(aria-label='Lesson status legend')
+          li
+            span.legend-dot.booked(aria-hidden='true')
+            | Booked
+          li
+            span.legend-dot.no-show(aria-hidden='true')
+            | No-show
+          li
+            span.legend-dot.cancelled(aria-hidden='true')
+            | Cancelled
+      if overlapCount
+        p.overlap-notice
+          span.notice-symbol(aria-hidden='true') !
+          | #{overlapCount} lessons overlap in this room. Both records are shown below.
+      .calendar-scroll(tabindex='0', role='region', aria-label='Seven-day calendar; scroll horizontally on smaller screens')
+        .calendar
+          .calendar-days
+            .time-zone GMT+7
+            each day in days
+              .day-heading(class=[day.today ? 'is-today' : '', day.closed ? 'is-closed' : ''], data-date=day.date)
+                span.day-name= day.weekday
+                span.day-number= day.number
+                if day.closed
+                  span.closed-label Closed
+          .calendar-body(style='height:' + timelineHeight + 'px')
+            .time-axis
+              each label in timeLabels
+                span.time-label(style='top:' + label.top + 'px')= label.text
+            each day in days
+              section.day-column(class=day.closed ? 'is-closed' : '', aria-label=day.weekday + ' ' + day.date + (day.closed ? ', centre closed' : ''))
+                each event in day.events
+                  include _booking-card
+            if !lessonCount
+              .calendar-empty
+                span.empty-mark(aria-hidden='true') ◷
+                h3 No lessons scheduled
+                p Room #{room.slice(1)} has no active lessons in this week.
+                if cancelled.length
+                  p Cancelled lessons are listed below.
+      .calendar-footer
+        span Tuesday–Monday view
+        span Times shown follow scheduled lessons.
+    if cancelled.length
+      section.cancelled-section(aria-labelledby='cancelled-heading')
+        .section-heading
+          h2#cancelled-heading Cancelled lessons
+          span= cancelled.length + (cancelled.length === 1 ? ' record' : ' records')
+        p.section-description These lessons are kept in the history and do not occupy calendar slots.
+        .cancelled-list
+          each event in cancelled
+            a.cancelled-card(href=event.href, data-booking-id=event.lesson_id)
+              span.status-pill.cancelled Cancelled
+              strong= event.student
+              span= event.dateLabel + ' · ' + event.timeLabel
+              span.cancelled-id= event.lesson_id + ' ↗'
+    if selected
+      include _booking-details

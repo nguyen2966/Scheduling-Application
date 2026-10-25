@@ -1,0 +1,8 @@
+a.booking-card(class=[event.status, event.overlapping ? 'has-overlap' : '', event.endMinute - event.startMinute < 60 ? 'is-short' : '', selected && selected.lesson_id === event.lesson_id ? 'is-selected' : ''], href=event.href, style=event.style, title=event.ariaLabel, aria-label=event.ariaLabel, data-booking-id=event.lesson_id, data-status=event.status)
+  span.card-student= event.student
+  span.card-time= (event.continuation ? '↳ ' : '') + event.timeLabel
+  span.card-meta
+    span.card-tutor= event.tutorName
+    span.card-status= event.statusLabel
+  if event.overlapping
+    span.overlap-tag Overlap

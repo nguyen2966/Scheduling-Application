@@ -16,10 +16,15 @@ import { AppError } from './api/errors/app-error.js';
 import { createErrorHandler } from './api/middleware/error-handler.js';
 import { withWriteTransaction } from './db/transaction.js';
 import { defaultReferenceTime } from './config.js';
+import { fileURLToPath } from 'node:url';
+import { clientForLocalRequest } from './web/api-client.js';
+import { createWebRouter } from './web/routes/bookings.js';
+import { createPageErrorHandler } from './web/middleware/error-handler.js';
+import { createBookingsPageController } from './web/controllers/bookings.js';
 
 // Constructing the app does not open a database, import data, or bind a port.
 export function createApp({ database, now = () => new Date(), logger = console,
-  businessNow = () => new Date(defaultReferenceTime) }) {
+  businessNow = () => new Date(defaultReferenceTime), webApiClientFactory = clientForLocalRequest }) {
   const roomRepository = createRoomRepository({ database });
   const roomService = createRoomService({ roomRepository });
   const roomController = createRoomController({ roomService, now });
@@ -41,5 +46,23 @@ export function createApp({ database, now = () => new Date(), logger = console,
     next(new AppError(404, 'RESOURCE_NOT_FOUND', 'The requested API resource does not exist.'));
   });
   app.use('/api/v1', createErrorHandler({ now, logger }));
+  app.set('view engine', 'pug');
+  app.set('views', fileURLToPath(new URL('./web/views', import.meta.url)));
+  app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Referrer-Policy', 'same-origin');
+    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    next();
+  });
+  app.get('/assets/js/api-client.js', (req, res) =>
+    res.sendFile(fileURLToPath(new URL('./web/api-client.js', import.meta.url))));
+  app.use('/assets', express.static(fileURLToPath(new URL('./web/public', import.meta.url))));
+  const bookingPageController = createBookingsPageController({ apiClientForRequest: webApiClientFactory, referenceNow: businessNow });
+  app.use(createWebRouter({ bookingPageController }));
+  app.use((req, res) => res.status(404).render('error', {
+    pageTitle: 'Page not found · Bright Path', title: 'Page not found', status: 404,
+    message: 'Return to the weekly schedule to find a booking.', calendarHref: '/bookings',
+  }));
+  app.use(createPageErrorHandler({ logger }));
   return app;
 }

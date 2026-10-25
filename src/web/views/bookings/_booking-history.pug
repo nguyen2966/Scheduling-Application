@@ -1,0 +1,25 @@
+li.history-item(data-change-id=change.id)
+  .history-heading
+    strong= change.actionLabel
+    time(datetime=change.changed_at)= change.timeLabel
+  span.communication-label(class=change.needs_manual_communication === true ? 'needs-follow-up' : '')= change.communicationLabel
+  if change.reason
+    p.history-reason= change.reason
+  if change.action === 'imported'
+    p.history-hint Starting record from the export. Earlier changes and communication are unknown.
+  if change.differences.length
+    dl.change-list
+      each difference in change.differences
+        div
+          dt= difference.label
+          dd
+            span.old-value= difference.before
+            span.change-arrow(aria-label='changed to') →
+            span.new-value= difference.after
+  details.snapshot
+    summary View saved state
+    dl.snapshot-list
+      each row in change.snapshot
+        div
+          dt= row.label
+          dd= row.value

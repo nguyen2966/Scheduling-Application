@@ -1,0 +1,27 @@
+doctype html
+html(lang='en')
+  head
+    meta(charset='utf-8')
+    meta(name='viewport', content='width=device-width, initial-scale=1')
+    meta(name='color-scheme', content='light')
+    title= pageTitle
+    link(rel='stylesheet', href='/assets/css/app.css')
+    script(type='module', src='/assets/js/booking-details.js')
+  body
+    a.skip-link(href='#main-content') Skip to main content
+    header.site-header
+      a.brand(href='/bookings', aria-label='Bright Path schedule')
+        span.brand-mark(aria-hidden='true')
+          span
+          span
+          span
+          span
+        span.brand-copy
+          strong Bright Path
+          span LEARNING CENTRE
+      nav.primary-nav(aria-label='Main navigation')
+        a.active(href='/bookings', aria-current='page') Schedule
+      .header-context
+        span.context-dot(aria-hidden='true')
+        span Front desk
+    block content

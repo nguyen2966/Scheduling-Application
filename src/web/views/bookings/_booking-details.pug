@@ -1,0 +1,42 @@
+dialog.booking-dialog(open, data-booking-details, data-booking-etag=selected.etag, aria-labelledby='booking-title')
+  .dialog-toolbar
+    span.eyebrow= 'BOOKING ' + selected.lesson_id
+    a.icon-button.close-details(href=calendarHref, data-close-details, aria-label='Close booking details', title='Close booking details') ×
+  .dialog-content
+    span.status-pill(class=selected.status)= selected.statusLabel
+    h2#booking-title(tabindex='-1', autofocus)= selected.student
+    p.detail-subtitle= selected.subject ? selected.subject + ' lesson' : 'Lesson details'
+    dl.booking-facts
+      div
+        dt Date
+        dd= selected.dateLabel
+      div
+        dt Time
+        dd= selected.timeLabel
+      div
+        dt Duration
+        dd= selected.duration_min + ' minutes'
+      div
+        dt Tutor
+        dd= selected.tutorName
+      div
+        dt Room
+        dd= selected.roomLabel
+    if selected.note
+      section.detail-note(aria-label='Booking note')
+        h3 Note
+        p= selected.note
+    if selected.needsCommunication
+      .communication-notice(role='status')
+        strong Needs manual communication
+        p A recorded change affects a finalized schedule. Staff follow-up is needed.
+    section.booking-history(aria-labelledby='history-title')
+      .section-heading
+        h3#history-title Booking history
+        span= selected.history.length + (selected.history.length === 1 ? ' record' : ' records')
+      if !selected.history.length
+        p.section-description No history records are available for this booking.
+      else
+        ol.history-list
+          each change in selected.history
+            include _booking-history
