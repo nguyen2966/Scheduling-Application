@@ -1,6 +1,6 @@
 # Bright Path Booking Management
 
-A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and the read-only Room API are implemented. Tutor/booking endpoints and the Pug interface remain placeholders.
+A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and the read-only Room and Tutor APIs are implemented. Booking endpoints and the Pug interface remain placeholders.
 
 ## Requirements
 
@@ -163,3 +163,13 @@ The timestamp above is illustrative; actual responses use the current server ins
 `HEAD` returns headers without a body. `OPTIONS` returns bodyless 204 and `Allow: GET, HEAD, OPTIONS`. Room mutations return 405 with the same `Allow` header; unknown `/api/v1` paths return 404. JSON parse errors return 400, oversized JSON bodies return 413 (16 KiB limit), and unsupported JSON charset/content encoding returns 415. Unexpected failures return a safe 500 response. All API JSON bodies use the same `data`, `code`, and `timestamp` envelope.
 
 The feature follows routes → controller → service → repository. `createApp` composes these layers without opening a database or listening on a port; `index.js` owns startup and shutdown. API tests cover isolated routing, controllers, services, SQL reads, HTTP contracts/error handling, configuration, and starting/restarting the actual entry point on localhost with a disposable seeded database.
+
+## Tutor API
+
+`GET /api/v1/tutors` returns `data.items`, sorted by `tutor_id`. Each tutor contains `tutor_id`, `tutor_name`, `subject`, and `phone`. The seeded response contains T1–T3 and preserves masked phone numbers as text.
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/tutors | ConvertTo-Json -Depth 5
+```
+
+Success uses the standard JSON envelope with code `TUTORS_RETRIEVED`. `HEAD` and `OPTIONS` are supported; mutation methods return 405. Run `npm run test:api` for repository, service, controller, routing, and HTTP tests.

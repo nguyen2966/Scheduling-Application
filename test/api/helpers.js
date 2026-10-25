@@ -31,3 +31,13 @@ export async function serve(t, app) {
   await once(server, 'listening');
   return `http://127.0.0.1:${server.address().port}`;
 }
+
+// Exercise a router with injected handlers, without a database or listening socket.
+export function invokeRouter(router, method, url = '/', params = {}) {
+  return new Promise((resolve) => {
+    const res = responseDouble();
+    res.end = () => { res.ended = true; resolve({ res }); return res; };
+    router.handle({ method, url, headers: {}, params }, res,
+      (error) => resolve({ error, res, unmatched: !error }));
+  });
+}

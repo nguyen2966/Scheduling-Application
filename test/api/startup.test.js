@@ -66,7 +66,7 @@ function waitForUrl(child) {
   });
 }
 
-test('real entry point serves rooms on localhost and can restart without changing data', { timeout: 15000 }, async (t) => {
+test('real entry point serves reference APIs on localhost and restarts without changing data', { timeout: 15000 }, async (t) => {
   const fixture = workspace(t);
   const database = openDatabase(fixture.path);
   setupDatabase(database);
@@ -81,6 +81,9 @@ test('real entry point serves rooms on localhost and can restart without changin
     assert.deepEqual(body.data.items, roomItems);
     assert.equal(body.code.http_status, 200);
     assert.ok(Number.isFinite(Date.parse(body.timestamp.iso)));
+    const tutorResponse = await fetch(`${url}/tutors`, { signal: AbortSignal.timeout(5000) });
+    assert.equal(tutorResponse.status, 200);
+    assert.deepEqual((await tutorResponse.json()).data.items.map((item) => item.tutor_id), ['T1', 'T2', 'T3']);
     t.diagnostic(`Localhost smoke test passed: ${url}/rooms`);
     await stop(child);
   }
