@@ -7,7 +7,9 @@ export function createErrorHandler({ now = () => new Date(), logger = console } 
 
     let failure = error;
     if (!(error instanceof AppError)) {
-      if (error.type === 'entity.parse.failed') {
+      if (error instanceof URIError && error.status === 400) {
+        failure = new AppError(400, 'INVALID_PATH', 'The request path contains invalid URL encoding.');
+      } else if (error.type === 'entity.parse.failed') {
         failure = new AppError(400, 'INVALID_JSON', 'The request body must contain valid JSON.');
       } else if (error.type === 'entity.too.large') {
         failure = new AppError(413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.');

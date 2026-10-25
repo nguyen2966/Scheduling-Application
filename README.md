@@ -1,6 +1,6 @@
 # Bright Path Booking Management
 
-A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and the read-only Room and Tutor APIs are implemented. Booking endpoints and the Pug interface remain placeholders.
+A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import, Room/Tutor reads, and Booking list/detail APIs are implemented. Booking history, booking mutations, and the Pug interface remain placeholders.
 
 ## Requirements
 
@@ -173,3 +173,23 @@ Invoke-RestMethod http://127.0.0.1:3000/api/v1/tutors | ConvertTo-Json -Depth 5
 ```
 
 Success uses the standard JSON envelope with code `TUTORS_RETRIEVED`. `HEAD` and `OPTIONS` are supported; mutation methods return 405. Run `npm run test:api` for repository, service, controller, routing, and HTTP tests.
+
+## Booking reads
+
+| Endpoint | Success data | Success code |
+|---|---|---|
+| `GET /api/v1/bookings` | `{ "items": [...] }` | `BOOKINGS_RETRIEVED` |
+| `GET /api/v1/bookings/{lesson_id}` | `{ "booking": {...} }` | `BOOKING_RETRIEVED` |
+
+The list accepts optional `from`, `to`, and `room` query parameters. `from` includes the given local start date; `to` excludes the given local start date. For a seven-day schedule use, for example, `from=2026-03-03&to=2026-03-10`. Omitted bounds are unrestricted, and omitting all filters returns every booking. Filtering uses the lesson's start date, not interval intersection.
+
+Dates must be real `YYYY-MM-DD` dates, `to` must be later than `from` when both are supplied, and `room` must identify an existing room. Unknown filters, empty values, and repeated filter parameters return 422 with code `INVALID_BOOKING_FILTER` and `data.details.field`. A valid query with no matches returns 200 and an empty array.
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:3000/api/v1/bookings?from=2026-03-03&to=2026-03-10&room=R1' | ConvertTo-Json -Depth 5
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/bookings/L001 | ConvertTo-Json -Depth 5
+```
+
+Booking objects contain `lesson_id`, `date`, `start_time`, `duration_min`, `student`, `tutor_id`, `room`, `status`, `cancelled_at`, `note`, and `version`. Lists are sorted by `date`, `start_time`, then `lesson_id`. All statuses and historical anomalies remain readable; overlapping records are not merged or hidden. No new history is created by reads.
+
+Detail responses include a strong booking-version ETag, for example `ETag: "booking-L001-v1"`. A matching `If-None-Match` returns bodyless 304; `HEAD` returns headers including the ETag without a body. A missing booking returns 404 with code `BOOKING_NOT_FOUND`; invalid URL encoding returns 400 with code `INVALID_PATH`. `OPTIONS` returns bodyless 204; unsupported mutation methods currently return 405. These version ETags will be used as edit preconditions when booking mutations are implemented.

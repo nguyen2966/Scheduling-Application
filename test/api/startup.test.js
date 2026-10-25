@@ -66,7 +66,7 @@ function waitForUrl(child) {
   });
 }
 
-test('real entry point serves reference APIs on localhost and restarts without changing data', { timeout: 15000 }, async (t) => {
+test('real entry point serves read APIs on localhost and restarts without changing data', { timeout: 15000 }, async (t) => {
   const fixture = workspace(t);
   const database = openDatabase(fixture.path);
   setupDatabase(database);
@@ -84,6 +84,13 @@ test('real entry point serves reference APIs on localhost and restarts without c
     const tutorResponse = await fetch(`${url}/tutors`, { signal: AbortSignal.timeout(5000) });
     assert.equal(tutorResponse.status, 200);
     assert.deepEqual((await tutorResponse.json()).data.items.map((item) => item.tutor_id), ['T1', 'T2', 'T3']);
+    const bookings = await fetch(`${url}/bookings?from=2026-03-04&to=2026-03-05&room=R1`);
+    assert.equal(bookings.status, 200);
+    assert.deepEqual((await bookings.json()).data.items.map((item) => item.lesson_id), ['L009', 'L010']);
+    const detail = await fetch(`${url}/bookings/L001`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.headers.get('etag'), '"booking-L001-v1"');
+    assert.equal((await detail.json()).data.booking.lesson_id, 'L001');
     t.diagnostic(`Localhost smoke test passed: ${url}/rooms`);
     await stop(child);
   }
