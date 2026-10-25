@@ -3,6 +3,8 @@ dialog.booking-dialog(open, data-booking-details, data-booking-etag=selected.eta
     span.eyebrow= 'BOOKING ' + selected.lesson_id
     a.icon-button.close-details(href=calendarHref, data-close-details, aria-label='Close booking details', title='Close booking details') ×
   .dialog-content
+    if creationSuccess
+      p.booking-success(role='status') Booking created successfully.
     span.status-pill(class=selected.status)= selected.statusLabel
     h2#booking-title(tabindex='-1', autofocus)= selected.student
     p.detail-subtitle= selected.subject ? selected.subject + ' lesson' : 'Lesson details'

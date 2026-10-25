@@ -7,9 +7,11 @@ block content
         p.eyebrow BOOKING CALENDAR
         h1 Weekly schedule
         p.page-subtitle A little clarity for every learning day.
-      .reference-date
-        span.context-dot(aria-hidden='true')
-        span= referenceLabel
+      .heading-actions
+        .reference-date
+          span.context-dot(aria-hidden='true')
+          span= referenceLabel
+        a.button.button-primary(href=newBookingHref) + New booking
     section.schedule-section(aria-label='Weekly room schedule')
       .schedule-toolbar
         .week-heading
@@ -55,12 +57,14 @@ block content
                 span.day-number= day.number
                 if day.closed
                   span.closed-label Closed
-          .calendar-body(style='height:' + timelineHeight + 'px')
+                else
+                  a.day-new(href=newBookingHref + '&date=' + day.date, aria-label='New booking on ' + day.weekday + ' ' + day.date, title='New booking') +
+          .calendar-body(style='height:' + timelineHeight + 'px', data-range-start=rangeStart)
             .time-axis
               each label in timeLabels
                 span.time-label(style='top:' + label.top + 'px')= label.text
             each day in days
-              section.day-column(class=day.closed ? 'is-closed' : '', aria-label=day.weekday + ' ' + day.date + (day.closed ? ', centre closed' : ''))
+              section.day-column(class=day.closed ? 'is-closed' : 'can-book', data-create-url=day.closed ? undefined : newBookingHref + '&date=' + day.date, aria-label=day.weekday + ' ' + day.date + (day.closed ? ', centre closed' : ''))
                 each event in day.events
                   include _booking-card
             if !lessonCount
@@ -88,3 +92,5 @@ block content
               span.cancelled-id= event.lesson_id + ' ↗'
     if selected
       include _booking-details
+    if form
+      include _booking-form

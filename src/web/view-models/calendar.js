@@ -115,7 +115,9 @@ export function buildCalendar({ selection, bookings, tutors, rooms, referenceTim
     if (minute % 60 === 0 || minute === rangeStart) timeLabels.push({ text: formatMinute(minute), top: (minute - rangeStart) / 30 * rowHeight });
   }
   return {
-    ...selection, days, rooms, timeLabels, timelineHeight: rangeEnd > rangeStart ? (rangeEnd - rangeStart) / 30 * rowHeight : 320,
+    ...selection, days, rooms, timeLabels, rangeStart: rangeEnd > rangeStart ? rangeStart : '',
+    newBookingHref: calendarUrl(week, room).replace('/bookings?', '/bookings/new?'),
+    timelineHeight: rangeEnd > rangeStart ? (rangeEnd - rangeStart) / 30 * rowHeight : 320,
     weekLabel: start.month === end.month && start.year === end.year
       ? `${start.toFormat('d')}–${end.toFormat('d LLLL yyyy')}` : `${start.toFormat('d LLL yyyy')}–${end.toFormat('d LLL yyyy')}`,
     referenceLabel: DateTime.fromJSDate(referenceTime, { zone }).toFormat('cccc, d LLLL'),

@@ -1,9 +1,10 @@
 export class ApiClientError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, details = {}) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -13,11 +14,12 @@ function unavailable() {
 
 // This module has no Node-only imports and can also be imported by browser modules.
 export function createApiClient({ baseUrl = '/api/v1', fetchImpl = globalThis.fetch } = {}) {
-  async function request(path) {
+  async function request(path, { method = 'GET', body: requestBody } = {}) {
     let response;
     try {
       response = await fetchImpl(`${baseUrl.replace(/\/$/, '')}${path}`, {
-        headers: { Accept: 'application/json' }, cache: 'no-store', redirect: 'error',
+        method, headers: { Accept: 'application/json', ...(requestBody === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        body: requestBody === undefined ? undefined : JSON.stringify(requestBody), cache: 'no-store', redirect: 'error',
         signal: AbortSignal.timeout(5000),
       });
     } catch {
@@ -31,7 +33,7 @@ export function createApiClient({ baseUrl = '/api/v1', fetchImpl = globalThis.fe
     if (!response.ok) {
       if (response.status >= 500) throw unavailable();
       throw new ApiClientError(response.status, body?.code?.key || 'API_REQUEST_FAILED',
-        body?.code?.message || 'The requested schedule could not be loaded.');
+        body?.code?.message || 'The requested schedule could not be loaded.', body?.data?.details);
     }
     if (!body || body.code?.http_status !== response.status || !body.data
       || typeof body.data !== 'object' || Array.isArray(body.data)) throw unavailable();
@@ -46,6 +48,11 @@ export function createApiClient({ baseUrl = '/api/v1', fetchImpl = globalThis.fe
     request,
     getRooms: () => items('/rooms'),
     getTutors: () => items('/tutors'),
+    async createBooking(input) {
+      const result = await request('/bookings', { method: 'POST', body: input });
+      if (result.status !== 201 || !result.data.booking) throw unavailable();
+      return result.data.booking;
+    },
     getBookings(filters = {}) {
       const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined));
       return items(`/bookings${query.size ? `?${query}` : ''}`);

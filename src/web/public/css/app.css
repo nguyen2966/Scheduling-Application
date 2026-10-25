@@ -143,6 +143,28 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .error-panel { text-align: center; max-width: 520px; padding: 40px; background: white; border: 1px solid var(--line); border-radius: 14px; }
 .error-panel h1 { font-size: 27px; }
 .error-panel p:not(.eyebrow) { color: var(--muted); margin-bottom: 24px; }
+.heading-actions { display: flex; align-items: center; gap: 14px; }
+.day-new { position: absolute; top: 8px; right: 9px; text-decoration: none; color: #73916e; font-size: 16px; line-height: 20px; width: 20px; text-align: center; border-radius: 4px; }
+.day-new:hover { background: #e5eddf; }
+.can-book { cursor: copy; }
+.booking-card { cursor: pointer; }
+.booking-success { padding: 11px 14px; background: #e8f1e6; color: #315d3c; border: 1px solid #b8d3b7; border-radius: 6px; font-size: 12px; }
+.booking-form { margin-top: 20px; }
+.form-field { margin-bottom: 16px; min-width: 0; }
+.form-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.form-field input, .form-field select, .form-field textarea { width: 100%; font: inherit; font-size: 13px; padding: 10px 11px; border: 1px solid #d5dfd1; border-radius: 6px; background: white; color: var(--ink); }
+.form-field input[readonly] { background: #f5f7f2; color: #778672; }
+.form-field input[aria-invalid='true'], .form-field select[aria-invalid='true'] { border-color: #ae634e; }
+.form-field textarea { resize: vertical; min-height: 78px; }
+.form-row { display: grid; grid-template-columns: 1.1fr 1fr; gap: 13px; }
+.optional-label { color: var(--muted); font-weight: 400; font-size: 11px; }
+.form-hint { color: var(--muted); font-size: 11px; margin-top: 5px; }
+.form-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 15px; border-top: 1px solid var(--line); }
+.form-actions .button { padding: 10px 15px; }
+.form-actions button:disabled { opacity: .6; cursor: wait; }
+.form-error { padding: 12px 14px; margin-bottom: 18px; color: #8d4634; background: #fff1e9; border: 1px solid #e9c6b5; border-radius: 7px; font-size: 12px; }
+.field-error { display: block; color: #9b4b35; font-size: 11px; margin-top: 5px; }
+.field-error:empty { display: none; }
 @media (max-width: 950px) {
   .site-header { padding: 0 24px; gap: 40px; }
   .page-shell { padding: 26px 24px 36px; }
@@ -160,6 +182,7 @@ dd { margin: 0; overflow-wrap: anywhere; }
   .page-heading { align-items: flex-start; margin-bottom: 22px; }
   h1 { font-size: 27px; }
   .reference-date { display: none; }
+  .heading-actions .button { font-size: 11px; padding: 8px 10px; white-space: nowrap; }
   .schedule-toolbar { padding: 18px 16px 12px; flex-direction: column; }
   .week-heading h2 { font-size: 20px; }
   .schedule-controls { width: 100%; justify-content: space-between; flex-wrap: nowrap; gap: 9px; margin-top: 8px; }

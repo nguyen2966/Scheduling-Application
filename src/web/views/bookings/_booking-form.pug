@@ -1,0 +1,52 @@
+dialog.booking-dialog(open, data-booking-create, aria-labelledby='new-booking-title')
+  .dialog-toolbar
+    span.eyebrow NEW LESSON
+    a.icon-button.close-details(href=calendarHref, data-close-details, aria-label='Close new booking form') ×
+  .dialog-content
+    h2#new-booking-title New booking
+    p.detail-subtitle= 'Room ' + room.slice(1) + ' · All times in Ho Chi Minh City'
+    form.booking-form(method='POST', action=calendarHref, data-booking-form)
+      input(type='hidden', name='_csrf', value=formToken)
+      input(type='hidden', name='room', value=form.room)
+      .form-error(role='alert', tabindex='-1', data-form-error, hidden=!formError)
+        span(data-form-error-message)= formError ? formError.message : ''
+      .form-field
+        label(for='new-student') Student
+        input#new-student(name='student', required, value=form.student, autocomplete='off', autofocus)
+        span.field-error(data-field-error='student')= formError && formError.field === 'student' ? formError.message : ''
+      .form-field
+        label(for='new-tutor') Tutor
+        select#new-tutor(name='tutor_id', required)
+          option(value='', selected=!form.tutor_id, disabled) Choose a tutor
+          each tutor in tutors
+            option(value=tutor.tutor_id, selected=form.tutor_id === tutor.tutor_id)= tutor.tutor_name + ' · ' + tutor.subject
+        span.field-error(data-field-error='tutor_id')= formError && formError.field === 'tutor_id' ? formError.message : ''
+      .form-field
+        label(for='new-room') Room
+        input#new-room(value='Room ' + form.room.slice(1), readonly)
+        span.field-error(data-field-error='room')= formError && formError.field === 'room' ? formError.message : ''
+      .form-row
+        .form-field
+          label(for='new-date') Date
+          input#new-date(type='date', name='date', required, value=form.date)
+          span.field-error(data-field-error='date')= formError && formError.field === 'date' ? formError.message : ''
+        .form-field
+          label(for='new-time') Start time
+          input#new-time(type='time', name='start_time', required, step='60', value=form.start_time)
+          span.field-error(data-field-error='start_time')= formError && formError.field === 'start_time' ? formError.message : ''
+      .form-field
+        label(for='new-duration') Duration
+        select#new-duration(name='duration_min', required)
+          if !['60', '90'].includes(String(form.duration_min))
+            option(value=form.duration_min, selected, disabled)= form.duration_min + ' — choose 60 or 90 minutes'
+          option(value='60', selected=String(form.duration_min) === '60') 60 minutes
+          option(value='90', selected=String(form.duration_min) === '90') 90 minutes
+        span.field-error(data-field-error='duration_min')= formError && formError.field === 'duration_min' ? formError.message : ''
+      .form-field
+        label(for='new-note') Note <span class='optional-label'>(optional)</span>
+        textarea#new-note(name='note', rows='3')= form.note
+        span.field-error(data-field-error='note')= formError && formError.field === 'note' ? formError.message : ''
+      p.form-hint Monday is closed. Availability is checked when you save.
+      .form-actions
+        a.button(href=calendarHref) Cancel
+        button.button.button-primary(type='submit', data-save-booking) Create booking

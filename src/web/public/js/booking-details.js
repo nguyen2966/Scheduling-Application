@@ -1,4 +1,4 @@
-const dialog = document.querySelector('[data-booking-details]');
+const dialog = document.querySelector('[data-booking-details], [data-booking-create]');
 if (dialog && typeof dialog.showModal === 'function') {
   const closeLink = dialog.querySelector('[data-close-details]');
   dialog.close();
