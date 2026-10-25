@@ -91,6 +91,12 @@ test('real entry point serves read APIs on localhost and restarts without changi
     assert.equal(detail.status, 200);
     assert.equal(detail.headers.get('etag'), '"booking-L001-v1"');
     assert.equal((await detail.json()).data.booking.lesson_id, 'L001');
+    const history = await fetch(`${url}/bookings/L001/changes`);
+    assert.equal(history.status, 200);
+    const changes = (await history.json()).data.items;
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].action, 'imported');
+    assert.equal(changes[0].after_snapshot.lesson_id, 'L001');
     t.diagnostic(`Localhost smoke test passed: ${url}/rooms`);
     await stop(child);
   }

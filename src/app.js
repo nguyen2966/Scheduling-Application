@@ -8,6 +8,9 @@ import { createTutorController } from './api/controllers/tutors.js';
 import { createBookingRepository } from './api/repositories/bookings.js';
 import { createBookingService } from './api/services/bookings.js';
 import { createBookingController } from './api/controllers/bookings.js';
+import { createBookingChangeRepository } from './api/repositories/booking-changes.js';
+import { createBookingChangeService } from './api/services/booking-changes.js';
+import { createBookingChangeController } from './api/controllers/booking-changes.js';
 import { createApiRouter } from './api/routes/index.js';
 import { AppError } from './api/errors/app-error.js';
 import { createErrorHandler } from './api/middleware/error-handler.js';
@@ -23,10 +26,13 @@ export function createApp({ database, now = () => new Date(), logger = console }
   const bookingRepository = createBookingRepository({ database });
   const bookingService = createBookingService({ bookingRepository, roomRepository });
   const bookingController = createBookingController({ bookingService, now });
+  const bookingChangeRepository = createBookingChangeRepository({ database });
+  const bookingChangeService = createBookingChangeService({ bookingChangeRepository, bookingService });
+  const bookingChangeController = createBookingChangeController({ bookingChangeService, now });
   const app = express();
   app.disable('x-powered-by');
   app.use('/api/v1', express.json({ limit: '16kb' }));
-  app.use('/api/v1', createApiRouter({ roomController, tutorController, bookingController }));
+  app.use('/api/v1', createApiRouter({ roomController, tutorController, bookingController, bookingChangeController }));
   app.use('/api/v1', (req, res, next) => {
     next(new AppError(404, 'RESOURCE_NOT_FOUND', 'The requested API resource does not exist.'));
   });

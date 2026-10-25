@@ -1,6 +1,6 @@
 # Bright Path Booking Management
 
-A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import, Room/Tutor reads, and Booking list/detail APIs are implemented. Booking history, booking mutations, and the Pug interface remain placeholders.
+A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and all read-only APIs (Rooms, Tutors, Booking list/detail, and Booking history) are implemented. Booking mutations and the Pug interface remain placeholders.
 
 ## Requirements
 
@@ -193,3 +193,17 @@ Invoke-RestMethod http://127.0.0.1:3000/api/v1/bookings/L001 | ConvertTo-Json -D
 Booking objects contain `lesson_id`, `date`, `start_time`, `duration_min`, `student`, `tutor_id`, `room`, `status`, `cancelled_at`, `note`, and `version`. Lists are sorted by `date`, `start_time`, then `lesson_id`. All statuses and historical anomalies remain readable; overlapping records are not merged or hidden. No new history is created by reads.
 
 Detail responses include a strong booking-version ETag, for example `ETag: "booking-L001-v1"`. A matching `If-None-Match` returns bodyless 304; `HEAD` returns headers including the ETag without a body. A missing booking returns 404 with code `BOOKING_NOT_FOUND`; invalid URL encoding returns 400 with code `INVALID_PATH`. `OPTIONS` returns bodyless 204; unsupported mutation methods currently return 405. These version ETags will be used as edit preconditions when booking mutations are implemented.
+
+## Booking history
+
+`GET /api/v1/bookings/{lesson_id}/changes` returns `data.items` with code `BOOKING_CHANGES_RETRIEVED`. Records are sorted by ascending audit `id` (append order), rather than timestamps that could differ because of clock adjustments.
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/bookings/L001/changes | ConvertTo-Json -Depth 8
+```
+
+Each history item includes `id`, `lesson_id`, `action`, `changed_at`, `before_snapshot`, `after_snapshot`, `reason`, and `needs_manual_communication`. Snapshots are JSON objects in the API response, rather than encoded JSON strings. `before_snapshot` can be `null`. The communication flag is `true`, `false`, or `null` (unknown); imported baselines have a null flag, no before snapshot, and no reason. `changed_at` for those baselines is the import instant and does not reconstruct earlier spreadsheet edits or prove notification delivery.
+
+A missing booking returns 404 (`BOOKING_NOT_FOUND`), while an existing booking with no audit records returns 200 with an empty array. A blank ID returns 422 (`INVALID_BOOKING_ID`). `HEAD` and `OPTIONS` follow the same bodyless behavior as the other read APIs; mutation methods return 405. Reading history never inserts or modifies audit records.
+
+`npm run test:api` tests all read features at their repository, service, controller, routing, and HTTP boundaries. It also starts the actual `index.js` process against a temporary seeded database, calls all read endpoints on localhost, restarts it, and verifies the seed remains unchanged.
