@@ -1,0 +1,19 @@
+{
+  "name": "synergieassignment",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nguyen2966/Scheduling-Application.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nguyen2966/Scheduling-Application/issues"
+  },
+  "homepage": "https://github.com/nguyen2966/Scheduling-Application#readme",
+  "description": ""
+}
