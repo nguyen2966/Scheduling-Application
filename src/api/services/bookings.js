@@ -1,12 +1,41 @@
 import { AppError } from '../errors/app-error.js';
 import { isCalendarDate } from '../../shared/calendar-date.js';
+import { randomUUID } from 'node:crypto';
+import { defaultReferenceTime } from '../../config.js';
+import { availabilityWindow } from '../../shared/scheduling-time.js';
+import { validateCreationInput, validateBookingReferences, validateAvailability } from './booking-validation.js';
+import { needsManualCommunication } from './schedule-cutoff.js';
 
 function invalidFilter(field, message) {
   return new AppError(422, 'INVALID_BOOKING_FILTER', message, { details: { field } });
 }
 
-export function createBookingService({ bookingRepository, roomRepository }) {
+export function createBookingService({ bookingRepository, roomRepository, tutorRepository,
+  bookingChangeRepository, runInTransaction, businessNow = () => new Date(defaultReferenceTime),
+  generateId = () => `B-${randomUUID()}` }) {
   return {
+    async createBooking(input) {
+      const { candidate, reason } = validateCreationInput(input);
+      // Every database read used to approve a booking occurs after BEGIN IMMEDIATE.
+      // All repositories below are synchronous and share the transaction's connection.
+      return runInTransaction(() => {
+        validateBookingReferences(candidate, {
+          tutor: tutorRepository.findById(candidate.tutor_id),
+          room: roomRepository.findById(candidate.room),
+        });
+        validateAvailability(candidate,
+          bookingRepository.findOccupying(availabilityWindow(candidate)),
+          bookingRepository.countTutorDaily(candidate.tutor_id, candidate.date));
+        const changedAt = businessNow();
+        const booking = bookingRepository.insert({ lesson_id: generateId(), ...candidate });
+        bookingChangeRepository.insert({
+          lesson_id: booking.lesson_id, action: 'created', changed_at: changedAt.toISOString(),
+          before_snapshot: null, after_snapshot: booking, reason,
+          needs_manual_communication: needsManualCommunication({ after: booking, changedAt }),
+        });
+        return booking;
+      });
+    },
     async listBookings(filters = {}) {
       if (filters === null || typeof filters !== 'object' || Array.isArray(filters)) {
         throw invalidFilter('query', 'Booking filters must be query parameters.');

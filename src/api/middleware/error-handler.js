@@ -7,7 +7,9 @@ export function createErrorHandler({ now = () => new Date(), logger = console } 
 
     let failure = error;
     if (!(error instanceof AppError)) {
-      if (error instanceof URIError && error.status === 400) {
+      if (error.code === 'ERR_SQLITE_ERROR' && [5, 6].includes(error.errcode & 0xff)) {
+        failure = new AppError(503, 'DATABASE_UNAVAILABLE', 'The database is busy. Please try again.');
+      } else if (error instanceof URIError && error.status === 400) {
         failure = new AppError(400, 'INVALID_PATH', 'The request path contains invalid URL encoding.');
       } else if (error.type === 'entity.parse.failed') {
         failure = new AppError(400, 'INVALID_JSON', 'The request body must contain valid JSON.');

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import test from 'node:test';
-import { loadConfig, projectRoot } from '../../src/config.js';
+import { defaultReferenceTime, loadConfig, projectRoot } from '../../src/config.js';
 import { AppError } from '../../src/api/errors/app-error.js';
 import { createErrorHandler } from '../../src/api/middleware/error-handler.js';
 import { sendResponse } from '../../src/api/response.js';
@@ -10,13 +10,14 @@ import { now, responseDouble, responseTime } from './helpers.js';
 test('configuration supplies defaults and accepts explicit host, port, and database path', () => {
   assert.deepEqual(loadConfig({}), {
     host: '127.0.0.1', port: 3000, databasePath: join(projectRoot, 'data', 'bright-path.sqlite'),
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: 'Asia/Ho_Chi_Minh', referenceTime: defaultReferenceTime,
   });
   assert.deepEqual(loadConfig({ HOST: 'localhost', PORT: '4100', DATABASE_PATH: 'data/other.sqlite' }), {
     host: 'localhost', port: 4100, databasePath: join(projectRoot, 'data', 'other.sqlite'),
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: 'Asia/Ho_Chi_Minh', referenceTime: defaultReferenceTime,
   });
   assert.equal(loadConfig({ PORT: '0' }).port, 0);
+  assert.equal(loadConfig({ REFERENCE_TIME: '2026-03-03T16:00:00+07:00' }).referenceTime, '2026-03-03T16:00:00+07:00');
 });
 
 test('configuration rejects invalid ports and blank or whitespace-containing hosts', () => {
@@ -24,6 +25,9 @@ test('configuration rejects invalid ports and blank or whitespace-containing hos
     assert.throws(() => loadConfig({ PORT }), /PORT/);
   }
   for (const HOST of ['', '  ', 'local host']) assert.throws(() => loadConfig({ HOST }), /HOST/);
+  for (const REFERENCE_TIME of ['', '2026-03-03T16:00:00', '2026-02-30T09:00:00Z']) {
+    assert.throws(() => loadConfig({ REFERENCE_TIME }), /REFERENCE_TIME/);
+  }
 });
 
 test('known application errors retain their status, safe details, and timestamp', () => {

@@ -104,11 +104,12 @@ test('booking controller forwards failures and safely encodes IDs in ETags', asy
   assert.equal(res.headers.ETag, '"booking-B-%22quoted%22-v3"');
 });
 
-test('booking router dispatches list/detail reads and rejects mutations for both routes', async () => {
+test('booking router dispatches list/detail reads and rejects unsupported methods', async () => {
   const calls = [];
   const router = createBookingRouter({ bookingController: {
     list(req, res) { calls.push('list'); res.end(); },
     get(req, res) { calls.push(req.params.lesson_id); res.end(); },
+    create(req, res) { calls.push('create'); res.end(); },
   } });
   await invokeRouter(router, 'GET');
   await invokeRouter(router, 'GET', '/L001');
@@ -116,10 +117,10 @@ test('booking router dispatches list/detail reads and rejects mutations for both
   assert.deepEqual(calls, ['list', 'L001', 'L001']);
   for (const path of ['/', '/L001']) {
     assert.equal((await invokeRouter(router, 'OPTIONS', path)).res.statusCode, 204);
-    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    for (const method of (path === '/' ? ['PUT', 'PATCH', 'DELETE'] : ['POST', 'PUT', 'PATCH', 'DELETE'])) {
       const { error, res } = await invokeRouter(router, method, path);
       assert.equal(error.httpStatus, 405);
-      assert.equal(res.headers.Allow, 'GET, HEAD, OPTIONS');
+      assert.equal(res.headers.Allow, path === '/' ? 'GET, HEAD, POST, OPTIONS' : 'GET, HEAD, OPTIONS');
     }
   }
   assert.equal((await invokeRouter(router, 'GET', '/L001/unknown')).unmatched, true);

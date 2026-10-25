@@ -1,6 +1,6 @@
 # Database design
 
-This is the SQLite design for Bright Path Booking Management. The schema and seed-import workflow are implemented under `src/db`; the API service responsibilities below describe the planned booking workflow. See `README.md` for reproducible setup and verification commands.
+This is the SQLite design for Bright Path Booking Management. The schema, seed import, read APIs, and transactional booking creation are implemented. Update, reschedule, and cancellation responsibilities below describe the remaining workflow. See `README.md` for reproducible setup and API usage.
 
 The design follows `DECISIONS.md` and the architecture, API, and UI skills. For HTTP behavior, use the skills' refined contract: `/api/v1`, cancellation through `PATCH /bookings/{id}`, and `412 Precondition Failed` for a stale `If-Match`.
 

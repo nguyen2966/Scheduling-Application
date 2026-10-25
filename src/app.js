@@ -14,9 +14,12 @@ import { createBookingChangeController } from './api/controllers/booking-changes
 import { createApiRouter } from './api/routes/index.js';
 import { AppError } from './api/errors/app-error.js';
 import { createErrorHandler } from './api/middleware/error-handler.js';
+import { withWriteTransaction } from './db/transaction.js';
+import { defaultReferenceTime } from './config.js';
 
 // Constructing the app does not open a database, import data, or bind a port.
-export function createApp({ database, now = () => new Date(), logger = console }) {
+export function createApp({ database, now = () => new Date(), logger = console,
+  businessNow = () => new Date(defaultReferenceTime) }) {
   const roomRepository = createRoomRepository({ database });
   const roomService = createRoomService({ roomRepository });
   const roomController = createRoomController({ roomService, now });
@@ -24,14 +27,15 @@ export function createApp({ database, now = () => new Date(), logger = console }
   const tutorService = createTutorService({ tutorRepository });
   const tutorController = createTutorController({ tutorService, now });
   const bookingRepository = createBookingRepository({ database });
-  const bookingService = createBookingService({ bookingRepository, roomRepository });
-  const bookingController = createBookingController({ bookingService, now });
   const bookingChangeRepository = createBookingChangeRepository({ database });
+  const bookingService = createBookingService({ bookingRepository, roomRepository, tutorRepository,
+    bookingChangeRepository, runInTransaction: (operation) => withWriteTransaction(database, operation), businessNow });
+  const bookingController = createBookingController({ bookingService, now });
   const bookingChangeService = createBookingChangeService({ bookingChangeRepository, bookingService });
   const bookingChangeController = createBookingChangeController({ bookingChangeService, now });
   const app = express();
   app.disable('x-powered-by');
-  app.use('/api/v1', express.json({ limit: '16kb' }));
+  app.use('/api/v1', express.json({ limit: '16kb', strict: false }));
   app.use('/api/v1', createApiRouter({ roomController, tutorController, bookingController, bookingChangeController }));
   app.use('/api/v1', (req, res, next) => {
     next(new AppError(404, 'RESOURCE_NOT_FOUND', 'The requested API resource does not exist.'));

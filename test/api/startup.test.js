@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { projectRoot } from '../../src/config.js';
+import { defaultReferenceTime, projectRoot } from '../../src/config.js';
 import { openDatabase } from '../../src/db/connection.js';
 import { setupDatabase } from '../../src/db/import-seed.js';
 import { verifySeedDatabase } from '../../src/db/verify-seed.js';
@@ -32,7 +32,8 @@ function workspace(t) {
   const path = join(directory, 'app.sqlite');
   const options = (extra) => ({
     cwd: directory,
-    env: { ...process.env, HOST: '127.0.0.1', PORT: '0', DATABASE_PATH: path, ...extra },
+    env: { ...process.env, HOST: '127.0.0.1', PORT: '0', DATABASE_PATH: path,
+      REFERENCE_TIME: defaultReferenceTime, ...extra },
   });
   return {
     path,
@@ -147,4 +148,49 @@ test('an occupied port causes a controlled startup failure', async (t) => {
   } finally {
     await new Promise((resolve) => blocker.close(resolve));
   }
+});
+
+test('concurrent localhost app processes create only one conflicting booking and preserve it after restart', { timeout: 20000 }, async (t) => {
+  const fixture = workspace(t);
+  const database = openDatabase(fixture.path);
+  setupDatabase(database);
+  database.close();
+  const first = fixture.start();
+  const second = fixture.start();
+  const urls = await Promise.all([waitForUrl(first), waitForUrl(second)]);
+  const input = { student: 'Concurrent Student', tutor_id: 'T2', room: 'R6',
+    date: '2026-03-07', start_time: '13:00', duration_min: 90 };
+  const responses = await Promise.all(urls.map((url) => fetch(`${url}/bookings`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    signal: AbortSignal.timeout(10000),
+  })));
+  assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+  const created = bodies[responses.findIndex((response) => response.status === 201)].data.booking;
+  const rejected = bodies[responses.findIndex((response) => response.status === 409)];
+  assert.equal(rejected.code.key, 'STUDENT_SCHEDULE_CONFLICT');
+  await stop(first);
+  await stop(second);
+
+  const restarted = fixture.start();
+  const url = await waitForUrl(restarted);
+  const detail = await fetch(`${url}/bookings/${created.lesson_id}`);
+  assert.equal(detail.status, 200);
+  assert.deepEqual((await detail.json()).data.booking, created);
+  const history = await fetch(`${url}/bookings/${created.lesson_id}/changes`);
+  const changes = (await history.json()).data.items;
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].action, 'created');
+  assert.deepEqual(changes[0].after_snapshot, created);
+  assert.equal(changes[0].needs_manual_communication, false);
+  await stop(restarted);
+  const saved = openDatabase(fixture.path, { readOnly: true });
+  try {
+    assert.equal(saved.prepare('SELECT count(*) AS count FROM bookings').get().count, 35);
+    assert.equal(saved.prepare('SELECT count(*) AS count FROM booking_changes').get().count, 35);
+    assert.equal(saved.prepare("SELECT count(*) AS count FROM booking_changes WHERE action = 'imported'").get().count, 34);
+  } finally {
+    saved.close();
+  }
+  t.diagnostic(`Create-booking localhost race and restart passed for ${created.lesson_id}`);
 });

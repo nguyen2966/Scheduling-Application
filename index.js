@@ -14,7 +14,7 @@ try {
     throw new Error('Database schema is not initialized or supported. Run npm run db:setup against a fresh database.');
   }
 
-  const app = createApp({ database });
+  const app = createApp({ database, businessNow: () => new Date(config.referenceTime) });
   const server = app.listen(config.port, config.host);
   server.once('listening', () => {
     const address = server.address();

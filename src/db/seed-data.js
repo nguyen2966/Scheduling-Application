@@ -2,21 +2,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'csv-parse/sync';
 import { seedDataDirectory } from '../config.js';
-import { isCalendarDate } from '../shared/calendar-date.js';
+import { isCalendarDate, isInstant } from '../shared/calendar-date.js';
 
-export { isCalendarDate };
+export { isCalendarDate, isInstant };
 
 const tutorColumns = ['tutor_id', 'tutor_name', 'subject', 'phone'];
 const bookingColumns = [
   'lesson_id', 'date', 'start_time', 'duration_min', 'student',
   'tutor_id', 'room', 'status', 'cancelled_at', 'note',
 ];
-
-export function isInstant(value) {
-  if (typeof value !== 'string') return false;
-  const parts = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,3})?(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value);
-  return parts !== null && isCalendarDate(parts[1]) && Number.isFinite(Date.parse(value));
-}
 
 function readCsv(directory, filename, expectedColumns) {
   try {

@@ -33,11 +33,12 @@ export async function serve(t, app) {
 }
 
 // Exercise a router with injected handlers, without a database or listening socket.
-export function invokeRouter(router, method, url = '/', params = {}) {
+export function invokeRouter(router, method, url = '/', params = {}, request = {}) {
   return new Promise((resolve) => {
     const res = responseDouble();
     res.end = () => { res.ended = true; resolve({ res }); return res; };
-    router.handle({ method, url, headers: {}, params }, res,
+    const headers = Object.fromEntries(Object.entries(request.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
+    router.handle({ method, url, params, ...request, headers, get: (name) => headers[name.toLowerCase()] }, res,
       (error) => resolve({ error, res, unmatched: !error }));
   });
 }

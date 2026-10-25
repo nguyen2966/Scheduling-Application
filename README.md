@@ -1,6 +1,6 @@
 # Bright Path Booking Management
 
-A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import and all read-only APIs (Rooms, Tutors, Booking list/detail, and Booking history) are implemented. Booking mutations and the Pug interface remain placeholders.
+A front-desk booking tool for Bright Path Learning Centre. SQLite setup/import, all read APIs, and booking creation are implemented. Booking editing/cancellation and the Pug interface remain placeholders.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ The importer validates CSV headers, field counts, required values, real calendar
 
 Seed values remain unchanged except for the documented storage mapping: durations become integers, and empty optional `note`/`cancelled_at` fields become SQL `NULL`. Every imported booking starts at version 1. Names, notes, masked tutor phone numbers, and supplied cancellation timestamp offsets are preserved.
 
-Historical scheduling violations are intentionally retained, including L007/L008, L009/L010, L032, L033/L034, and T1's seven bookings on 2026-03-06. New-booking overlap, capacity, and Monday rules belong to the future API service; those policy checks do not run during seed import.
+Historical scheduling violations are intentionally retained, including L007/L008, L009/L010, L032, L033/L034, and T1's seven bookings on 2026-03-06. The API service enforces overlap, capacity, and Monday rules for new bookings; those policy checks do not run during seed import.
 
 Each booking receives one immutable `imported` history record containing its full baseline snapshot. `changed_at` records the actual import instant in UTC, while previous state and communication status remain unknown (`NULL`). This timestamp does not assert when the spreadsheet booking was last edited or communicated. Tests inject a fixed import clock for repeatability.
 
@@ -106,6 +106,7 @@ The default address is **http://127.0.0.1:3000/api/v1/rooms**. `npm run dev` sta
 | `HOST` | `127.0.0.1` | Listening hostname/IP |
 | `PORT` | `3000` | Port 0–65535; 0 asks the OS for an available port |
 | `DATABASE_PATH` | `data/bright-path.sqlite` | Existing database, relative to the project root or absolute |
+| `REFERENCE_TIME` | `2026-03-03T06:00:00.000Z` | Fixed booking-demo clock (13:00 local on March 3); ISO instant with an explicit timezone |
 
 Set exported environment variables before `npm start` to override these values. For example, in PowerShell:
 
@@ -192,7 +193,7 @@ Invoke-RestMethod http://127.0.0.1:3000/api/v1/bookings/L001 | ConvertTo-Json -D
 
 Booking objects contain `lesson_id`, `date`, `start_time`, `duration_min`, `student`, `tutor_id`, `room`, `status`, `cancelled_at`, `note`, and `version`. Lists are sorted by `date`, `start_time`, then `lesson_id`. All statuses and historical anomalies remain readable; overlapping records are not merged or hidden. No new history is created by reads.
 
-Detail responses include a strong booking-version ETag, for example `ETag: "booking-L001-v1"`. A matching `If-None-Match` returns bodyless 304; `HEAD` returns headers including the ETag without a body. A missing booking returns 404 with code `BOOKING_NOT_FOUND`; invalid URL encoding returns 400 with code `INVALID_PATH`. `OPTIONS` returns bodyless 204; unsupported mutation methods currently return 405. These version ETags will be used as edit preconditions when booking mutations are implemented.
+Detail responses include a strong booking-version ETag, for example `ETag: "booking-L001-v1"`. A matching `If-None-Match` returns bodyless 304; `HEAD` returns headers including the ETag without a body. A missing booking returns 404 with code `BOOKING_NOT_FOUND`; invalid URL encoding returns 400 with code `INVALID_PATH`. `OPTIONS` returns bodyless 204. The collection supports `POST` creation; editing/deleting remains unsupported and returns 405. These version ETags will be used as edit preconditions when booking updates are implemented.
 
 ## Booking history
 
@@ -207,3 +208,60 @@ Each history item includes `id`, `lesson_id`, `action`, `changed_at`, `before_sn
 A missing booking returns 404 (`BOOKING_NOT_FOUND`), while an existing booking with no audit records returns 200 with an empty array. A blank ID returns 422 (`INVALID_BOOKING_ID`). `HEAD` and `OPTIONS` follow the same bodyless behavior as the other read APIs; mutation methods return 405. Reading history never inserts or modifies audit records.
 
 `npm run test:api` tests all read features at their repository, service, controller, routing, and HTTP boundaries. It also starts the actual `index.js` process against a temporary seeded database, calls all read endpoints on localhost, restarts it, and verifies the seed remains unchanged.
+
+## Create a booking
+
+`POST /api/v1/bookings` accepts an `application/json` object. Required fields are `student`, `tutor_id`, `room`, `date`, `start_time`, and `duration_min`. `note` and `reason` are optional text or null. Student names are trimmed, notes retain their supplied text, and blank reasons become null. All other fields, including client-supplied `lesson_id`, `status`, `version`, and `cancelled_at`, are rejected.
+
+On a fresh seeded database, this PowerShell example creates a valid lesson:
+
+```powershell
+$body = @{
+  student = 'New Student'
+  tutor_id = 'T2'
+  room = 'R6'
+  date = '2026-03-07'
+  start_time = '13:00'
+  duration_min = 90
+  note = 'Extra lesson'
+} | ConvertTo-Json
+
+Invoke-RestMethod http://127.0.0.1:3000/api/v1/bookings `
+  -Method Post -ContentType 'application/json' -Body $body | ConvertTo-Json -Depth 5
+```
+
+Success returns **201 Created**, `code.key: "BOOKING_CREATED"`, and the saved resource in `data.booking`. The server generates a `B-<UUID>` ID and initializes `status: "booked"`, `version: 1`, and `cancelled_at: null`. The response includes `Location: /api/v1/bookings/{id}` and `ETag: "booking-{id}-v1"`. The new resource can immediately be read through the detail, list, and history APIs. Repeating the example unchanged returns a scheduling conflict.
+
+Creation enforces these rules in the API service:
+
+- Duration must be the JSON number **60 or 90**. Dates and `HH:mm` times must be valid. Existing tutor and room references are required.
+- Monday is closed. A lesson crossing into Monday is rejected; one ending exactly at Monday 00:00 is allowed. No numeric opening/closing hours or 30-minute start-time rule is invented.
+- Student, tutor, and room intervals cannot overlap. Checks cover every room and neighboring dates for overnight lessons. Endpoints are half-open, so consecutive lessons may share an end/start time.
+- `cancelled` records release resources; `no_show` records occupy resources and count toward the daily limit. A tutor may have at most six counted bookings per local **start date**.
+- Student matching uses the exact stored name after trimming the new input, as documented in the database design. Imported violations remain unchanged; paired-lesson overrides are unsupported.
+
+Validation of references, availability, and daily counts starts after acquiring a SQLite `BEGIN IMMEDIATE` write transaction. The booking and one `created` audit record commit together; an audit or database failure rolls back the booking. Competing processes share the same database lock. A lock wait is bounded to five seconds; if the database remains busy, the API returns a safe 503 response. See [SQLite transaction behavior](https://www.sqlite.org/lang_transaction.html).
+
+Scheduling and cut-off calculations use the named `Asia/Ho_Chi_Minh` timezone through the pinned [Luxon dependency](https://moment.github.io/luxon/api-docs/index.html). Creation uses the fixed `REFERENCE_TIME` clock for audit `changed_at` and business decisions. Response-envelope timestamps still use the current server instant, and seed-import baselines still use the actual import instant. Override `REFERENCE_TIME` before startup to reproduce a different business-time scenario, for example:
+
+```powershell
+$env:REFERENCE_TIME = '2026-03-06T16:00:00+07:00'
+npm start
+```
+
+A created booking is flagged for manual communication when its affected schedule has reached the **16:00 previous-day local cut-off**, including exactly 16:00. Creation remains allowed. Retrieve `/api/v1/bookings/{id}/changes` to inspect the full saved snapshot, reason, and `needs_manual_communication` flag. This does not record notification delivery or acknowledgment.
+
+| Failure | HTTP status / code |
+|---|---|
+| Invalid fields or unknown tutor/room | 422 `INVALID_BOOKING_INPUT` |
+| Lesson occupies Monday | 422 `CENTRE_CLOSED` |
+| Student/tutor/room overlap | 409 `STUDENT_SCHEDULE_CONFLICT`, `TUTOR_SCHEDULE_CONFLICT`, or `ROOM_SCHEDULE_CONFLICT` |
+| Daily tutor limit reached | 409 `TUTOR_DAILY_LIMIT_EXCEEDED` |
+| Missing/unsupported content type | 415 `UNSUPPORTED_MEDIA_TYPE` |
+| Malformed JSON | 400 `INVALID_JSON` |
+| Database still locked after its wait | 503 `DATABASE_UNAVAILABLE` |
+| Unexpected persistence failure | 500 `INTERNAL_SERVER_ERROR` |
+
+Validation/conflict errors identify the affected field in `data.details`; overlap errors also include `conflicting_lesson_ids`. Rejected operations do not add booking or history records.
+
+Run `npm test` for the complete suite or `npm run test:api` for API coverage. Creation tests include unit tests for validation, cut-off logic, service, controller, and routing; real SQLite repository/transaction tests; HTTP tests for success and rejection; injected audit failures; and two actual localhost app processes racing to create the same lesson, followed by a restart/persistence check. Tests use disposable databases and leave the default database unchanged. `db:verify` remains an exact seed-baseline check and is expected to fail on a database containing newly created bookings.

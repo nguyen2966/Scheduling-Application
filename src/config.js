@@ -1,6 +1,9 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isInstant } from './shared/calendar-date.js';
 
+export const schedulingTimeZone = 'Asia/Ho_Chi_Minh';
+export const defaultReferenceTime = '2026-03-03T06:00:00.000Z';
 export const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 export const seedDataDirectory = resolve(projectRoot, 'data');
 
@@ -18,10 +21,15 @@ export function loadConfig(environment = process.env) {
   if (typeof host !== 'string' || host.trim() === '' || /\s/.test(host)) {
     throw new Error('HOST must be a nonblank hostname or IP address without spaces.');
   }
+  const referenceTime = environment.REFERENCE_TIME ?? defaultReferenceTime;
+  if (!isInstant(referenceTime)) {
+    throw new Error('REFERENCE_TIME must be an ISO 8601 instant with an explicit timezone.');
+  }
   return {
     port: Number(portText),
     host,
     databasePath: resolveDatabasePath(environment.DATABASE_PATH || 'data/bright-path.sqlite'),
-    timeZone: 'Asia/Ho_Chi_Minh',
+    timeZone: schedulingTimeZone,
+    referenceTime,
   };
 }
