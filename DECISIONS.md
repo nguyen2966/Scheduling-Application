@@ -292,3 +292,53 @@ Additional tests cover:
 - Rejecting concurrent or stale conflicting updates.
 
 The README documents CSV import, database initialization, application startup, reproducible tests, and a fixed reference timestamp within the seed data period.
+
+## 4. Reflection & Next Steps
+
+### 4.1. What I Would Build Next With One More Week
+
+My next priority would be **reliable schedule change communication**.
+
+The booking management tool provides a consistent source of truth, but tutors and families still depend on manual WhatsApp messages to learn about changes.
+
+With another week, I would prioritize:
+
+1. **Change notifications:** Notify affected tutors when bookings are created, rescheduled, or cancelled, with delivery status and failure handling.
+2. **Schedule acknowledgment:** Let tutors confirm they have seen changes made after the 16:00 cut-off.
+3. **Business exceptions:** Support paired lessons and authorized scheduling overrides once the owner clarifies the rules.
+
+These improvements would further reduce the operational dependency on the receptionist.
+
+### 4.2. Known Weaknesses
+
+- **Manual communication:** Booking changes are recorded but do not guarantee that tutors or families have been informed.
+- **Non-atomic room transfers:** Moving a lesson between rooms requires Cancel + Create. If creation fails, the original booking remains cancelled.
+- **Incomplete business rules:** Paired lessons, exceptional opening days, and exact operating hours require owner clarification.
+- **Student identification:** The CSV provides student names rather than stable IDs, making name-based conflict detection imperfect.
+- **Limited access control:** The MVP assumes an authorized staff operator rather than implementing full authentication and role management.
+- **Historical inconsistencies:** Invalid seed records are preserved, so existing scheduling conflicts remain visible until manually resolved.
+
+The tool improves booking correctness and usability, but does not completely replace Mai's coordination responsibilities.
+
+### 4.3. How AI Assisted
+
+I used AI to help:
+
+- Analyze the assessment brief and CSV data for scheduling conflicts and ambiguous business rules.
+- Compare candidate features and challenge the initial prioritization.
+- Review the data model, REST API design, and separation of frontend and backend responsibilities.
+- Identify potential over-engineering and security concerns in implementation patterns.
+
+AI-generated suggestions were treated as proposals rather than final decisions. I reviewed them against the assessment requirements, business constraints, and maintainability goals.
+
+### 4.4. One AI Suggestion I Rejected
+
+**Rejected: Treating conflict detection and rescheduling as separate competing features.**
+
+The initial AI-assisted analysis proposed scheduling conflict detection and safe rescheduling as independent feature candidates.
+
+I rejected this distinction because conflict validation is a necessary safeguard within booking management, not a standalone business workflow.
+
+Instead, I chose **Front-Desk Booking Management** as one cohesive capability, combining booking creation, editing, validation, and change tracking behind a simple interface.
+
+This better addresses the operational need for someone other than Mai to manage bookings, while keeping the implementation focused on a single business outcome.
